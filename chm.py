@@ -139,7 +139,7 @@ def generate_hhp_file(translated_dir, output_file):
     return hhp_path
 
 def compile_chm(translated_dir, output_chm):
-    hhp_file = os.path.join(translated_dir, 'project.hhp')
+    hhp_file = generate_hhp_file(translated_dir, 'project.hhp')
 
     # Ensure the hhp file exists
     if not os.path.isfile(hhp_file):
@@ -167,17 +167,20 @@ def compile_chm(translated_dir, output_chm):
         raise
 
     # Move the compiled CHM to the desired output location
-    compiled_chm = os.path.join(translated_dir, os.path.basename(output_chm))
-    if os.path.isfile(compiled_chm):
-        shutil.move(compiled_chm, output_chm)
-        print(f"Compiled CHM moved to: {output_chm}")
+    if os.path.isfile(hhp_file):
+        shutil.move(hhp_file, output_chm)
+        print(f"Compiled CHM renamed to: {output_chm}")
     else:
-        raise FileNotFoundError(f"Compiled CHM not found: {compiled_chm}")
+        raise FileNotFoundError(f"Compiled CHM not found: {hhp_file}")
         
 # Main function
 def main(input_chm, output_chm, temp_dir='temp_chm'):
     decompile_dir = os.path.join(temp_dir, 'decompiled')
     translated_dir = os.path.join(temp_dir, 'translated')
+
+    # Clean up any leftovers from interrupted runs
+    print(f"Cleaning up temporary directory {temp_dir}...")
+    shutil.rmtree(temp_dir)
 
     # Decompile the CHM file
     decompile_chm(input_chm, decompile_dir)
