@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import argparse
 from bs4 import BeautifulSoup
+from bs4.element import Declaration, Doctype
 from googletrans import Translator
 
 # Paths to HTML Help Workshop tools
@@ -28,7 +29,11 @@ def translate_html(content, src='ja', dest='en'):
         if (len(tag) < 2):
             continue
             
+        if isinstance(tag, (Declaration, Doctype)):
+            continue
+
         print("Processing string:", tag.string)
+
         if tag.string and tag.parent.name not in ['script', 'style', 'img']:
             original_text = tag.string
             try:
