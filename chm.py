@@ -42,14 +42,7 @@ def translate_html(content, src='ja', dest='en'):
     print("Translation completed.")
     return str(soup)
 
-    
-    print("Translation completed.")
-    return str(soup)
-
-
 # Function to process HTML files in a directory
-import chardet
-
 def process_html_files(input_dir, output_dir, src_lang='ja', dest_lang='en'):
     print("Processing HTML files...")
     for root, dirs, files in os.walk(input_dir):
@@ -80,7 +73,41 @@ def process_html_files(input_dir, output_dir, src_lang='ja', dest_lang='en'):
 
     print("HTML files processing completed.")
 
-def copy_additional_files(decompiled_dir, translated_dir):
+def translate_hhc_file(file_path, src='ja', dest='en'):
+    print(f"Translating .hhc file: {file_path}")
+    translator = Translator()
+
+    try:
+        with open(file_path, 'rb') as f:
+            raw_data = f.read()
+            result = chardet.detect(raw_data)
+            encoding = result['encoding']
+            print(f"Detected encoding: {encoding}")
+            content = raw_data.decode(encoding)
+
+        soup = BeautifulSoup(content, 'html.parser')
+        for obj in soup.find_all('object'):
+            for param in obj.find_all('param', {'name': 'Name'}):
+                if param.get('value'):
+                    original_text = param['value']
+                    try:
+                        translated_text = translator.translate(original_text, src=src, dest=dest).text
+                        param['value'] = translated_text
+                        print(f"Translated text: '{original_text}' -> '{translated_text}'")
+                    except Exception as e:
+                        print(f"Translation failed for text '{original_text}'. Error: {e}")
+                        param['value'] = original_text  # Fallback to original text if translation fails
+
+        translated_content = str(soup)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(translated_content)
+
+        print(f"Translation completed for .hhc file: {file_path}")
+
+    except Exception as e:
+        print(f"Failed to translate .hhc file {file_path}: {e}")
+
+def copy_and_translate_additional_files(decompiled_dir, translated_dir):
     additional_file_extensions = ['.hhc', '.hhk', '.css']
     for root, dirs, files in os.walk(decompiled_dir):
         for file in files:
@@ -90,6 +117,9 @@ def copy_additional_files(decompiled_dir, translated_dir):
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copyfile(file_path, target_path)
                 print(f"Copied {file} to {target_path}")
+                
+                if file.endswith('.hhc'):
+                    translate_hhc_file(target_path, src='ja', dest='en')
 
     images_folder = os.path.join(decompiled_dir, 'images')
 
@@ -172,15 +202,14 @@ def compile_chm(translated_dir, output_chm):
         print(f"Compiled CHM renamed to: {output_chm}")
     else:
         raise FileNotFoundError(f"Compiled CHM not found: {hhp_file}")
-        
-# Main function
+
 def main(input_chm, output_chm, temp_dir='temp_chm'):
     decompile_dir = os.path.join(temp_dir, 'decompiled')
     translated_dir = os.path.join(temp_dir, 'translated')
 
     # Clean up any leftovers from interrupted runs
     print(f"Cleaning up temporary directory {temp_dir}...")
-    shutil.rmtree(temp_dir)
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
     # Decompile the CHM file
     decompile_chm(input_chm, decompile_dir)
@@ -188,8 +217,8 @@ def main(input_chm, output_chm, temp_dir='temp_chm'):
     # Translate the HTML files
     process_html_files(decompile_dir, translated_dir)
 
-    # Copy additional files (images, CSS, .hhc, .hhk)
-    copy_additional_files(decompile_dir, translated_dir)
+    # Copy and translate additional files (images, CSS, .hhc, .hhk)
+    copy_and_translate_additional_files(decompile_dir, translated_dir)
 
     # Compile the translated files into a new CHM file
     compile_chm(translated_dir, output_chm)
