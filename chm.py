@@ -113,28 +113,23 @@ def translate_hhc_file(file_path, src='ja', dest='en'):
         print(f"Failed to translate .hhc file {file_path}: {e}")
 
 def copy_and_translate_additional_files(decompiled_dir, translated_dir):
-    additional_file_extensions = ['.hhc', '.hhk', '.css']
     for root, dirs, files in os.walk(decompiled_dir):
+        for dir in dirs:
+            src_dir_path = os.path.join(root, dir)
+            dst_dir_path = os.path.join(translated_dir, os.path.relpath(src_dir_path, decompiled_dir))
+            os.makedirs(dst_dir_path, exist_ok=True)
+            print(f"Created directory {dst_dir_path}")
+
         for file in files:
-            if any(file.endswith(ext) for ext in additional_file_extensions):
+            if not file.endswith('.html'):
                 file_path = os.path.join(root, file)
                 target_path = os.path.join(translated_dir, os.path.relpath(file_path, decompiled_dir))
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 shutil.copyfile(file_path, target_path)
                 print(f"Copied {file} to {target_path}")
-                
+
                 if file.endswith('.hhc'):
                     translate_hhc_file(target_path, src='ja', dest='en')
-
-    images_folder = os.path.join(decompiled_dir, 'images')
-
-    if os.path.exists(images_folder):
-        target_images_folder = os.path.join(translated_dir, 'images')
-        try:
-            shutil.copytree(images_folder, target_images_folder, dirs_exist_ok=True)
-            print(f"Copied images folder to {target_images_folder}")
-        except FileExistsError:
-            print(f"Images folder {target_images_folder} already exists, skipping copy.")
 
 def generate_hhp_file(translated_dir, output_file):
     print(f"Generating HHP file in {translated_dir}...")
