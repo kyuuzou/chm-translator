@@ -208,9 +208,13 @@ def compile_chm(translated_dir, output_chm):
     else:
         raise FileNotFoundError(f"Compiled CHM not found: {hhp_file}")
 
-def main(input_chm, output_chm, temp_dir='temp_chm'):
+def translate_chm(input_chm, temp_dir='temp_chm'):
     decompile_dir = os.path.join(temp_dir, 'decompiled')
     translated_dir = os.path.join(temp_dir, 'translated')
+
+    # Define the output CHM file name
+    file_name = os.path.basename(input_chm)
+    output_chm = f"[EN] {file_name}"
 
     # Clean up any leftovers from interrupted runs
     print(f"Cleaning up temporary directory {temp_dir}...")
@@ -233,11 +237,26 @@ def main(input_chm, output_chm, temp_dir='temp_chm'):
     shutil.rmtree(temp_dir)
     print("Cleanup completed.")
 
+def translate_chm_files_recursively(input_dir):
+    for root, dirs, files in os.walk(input_dir):
+        for file in files:
+            if file.endswith('.chm'):
+                chm_file = os.path.join(root, file)
+
+                # Translate the CHM file
+                translate_chm(chm_file)
+
+def main(args):
+    if args.recursive:
+        translate_chm_files_recursively(args.input_chm)
+    else:
+        translate_chm(args.input_chm)
+
 # Entry point
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Translate and recompile CHM files.")
     parser.add_argument("input_chm", help="Path to the input CHM file")
-    parser.add_argument("output_chm", help="Path to the output translated CHM file")
+    parser.add_argument("--recursive", action="store_true", help="Translate CHM files recursively in a directory")    
     args = parser.parse_args()
 
-    main(args.input_chm, args.output_chm)
+    main(args)
