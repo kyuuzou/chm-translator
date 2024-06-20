@@ -18,6 +18,14 @@ def decompile_chm(chm_file, output_dir):
     subprocess.run([HH_DECOMPILER_PATH, '-decompile', output_dir, chm_file], check=True)
     print(f"Decompile completed for {chm_file}")
 
+    # Rename .hhc and .hhk files to target.hhc and target.hhk
+    for root, _, files in os.walk(output_dir):
+        for file in files:
+            if file.endswith('.hhc'):
+                os.rename(os.path.join(root, file), os.path.join(root, 'target.hhc'))
+            elif file.endswith('.hhk'):
+                os.rename(os.path.join(root, file), os.path.join(root, 'target.hhk'))
+
 # Function to translate HTML content
 def translate_html(content, src='ja', dest='en'):
     print("Translating HTML content...")
@@ -28,7 +36,7 @@ def translate_html(content, src='ja', dest='en'):
     for tag in soup.find_all(string=True):
         if (len(tag) < 2):
             continue
-            
+
         if isinstance(tag, (Declaration, Doctype)):
             continue
 
@@ -43,7 +51,7 @@ def translate_html(content, src='ja', dest='en'):
                 translated_text = original_text  # Fallback to original text if translation fails
             print(f"Translated text: '{original_text}' -> '{translated_text}'")
             tag.string.replace_with(translated_text)
-    
+
     print("Translation completed.")
     return str(soup)
 
@@ -139,9 +147,9 @@ def generate_hhp_file(translated_dir, output_file):
 
     for root, dirs, files in os.walk(translated_dir):
         for file in files:
-            if file.endswith('.hhc'):
+            if file.endswith('target.hhc'):
                 hhc_file = os.path.join(root, file)
-            elif file.endswith('.hhk'):
+            elif file.endswith('target.hhk'):
                 hhk_file = os.path.join(root, file)
             elif file.endswith('.html'):
                 html_files.append(os.path.relpath(os.path.join(root, file), translated_dir))
@@ -185,7 +193,7 @@ def compile_chm(translated_dir, output_chm):
         )
         print(f"Compilation output:\n{result.stdout}")
         print(f"Compilation errors:\n{result.stderr}")
-        
+
         # Check the return code and handle errors
         if result.returncode != 0:
             print(f"Warning: hhc.exe returned non-zero exit status {result.returncode}")
@@ -197,8 +205,8 @@ def compile_chm(translated_dir, output_chm):
         raise
 
     # Move the compiled CHM to the desired output location
-    if os.path.isfile(hhp_file):
-        shutil.move(hhp_file, output_chm)
+    if os.path.isfile(os.path.join(translated_dir, 'project.hhp')):
+        shutil.move(os.path.join(translated_dir, 'project.hhp'), output_chm)
         print(f"Compiled CHM renamed to: {output_chm}")
     else:
         raise FileNotFoundError(f"Compiled CHM not found: {hhp_file}")
@@ -207,16 +215,21 @@ def translate_chm(input_chm, temp_dir='temp_chm'):
     decompile_dir = os.path.join(temp_dir, 'decompiled')
     translated_dir = os.path.join(temp_dir, 'translated')
 
-    # Define the output CHM file name
+    # Define the temporary and output CHM file names
+    temp_chm = os.path.join(temp_dir, 'target.chm')
     file_name = os.path.basename(input_chm)
     output_chm = f"[EN] {file_name}"
 
     # Clean up any leftovers from interrupted runs
     print(f"Cleaning up temporary directory {temp_dir}...")
     shutil.rmtree(temp_dir, ignore_errors=True)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Make a temporary copy of the original CHM file and rename it to target.chm
+    shutil.copyfile(input_chm, temp_chm)
 
     # Decompile the CHM file
-    decompile_chm(input_chm, decompile_dir)
+    decompile_chm(temp_chm, decompile_dir)
 
     # Translate the HTML files
     process_html_files(decompile_dir, translated_dir)
@@ -225,7 +238,11 @@ def translate_chm(input_chm, temp_dir='temp_chm'):
     copy_and_translate_additional_files(decompile_dir, translated_dir)
 
     # Compile the translated files into a new CHM file
-    compile_chm(translated_dir, output_chm)
+    compile_chm(translated_dir, temp_chm)
+
+    # Rename the temporary CHM file back to the original name
+    shutil.move(temp_chm, output_chm)
+    print(f"Compiled and translated CHM saved as: {output_chm}")
 
     # Clean up temporary directories
     print(f"Cleaning up temporary directory {temp_dir}...")
@@ -251,7 +268,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Translate and recompile CHM files.")
     parser.add_argument("input_chm", help="Path to the input CHM file")
-    parser.add_argument("--recursive", action="store_true", help="Translate CHM files recursively in a directory")    
+    parser.add_argument("--recursive", action="store_true", help="Translate CHM files recursively in a directory")
     args = parser.parse_args()
 
     main(args)
